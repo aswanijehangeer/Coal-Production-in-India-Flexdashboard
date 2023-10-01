@@ -1,0 +1,116 @@
+library(tidyverse)
+library(plotly)
+library(readxl)
+library(janitor)
+library(sf)
+library(shiny)
+
+theme_set(theme_minimal(base_size = 12, base_family = "Open Sans"))
+
+theme_update(
+  axis.ticks = element_line(color = "grey9"),
+  axis.ticks.length = unit(0.5, "lines"),
+  panel.grid.minor = element_blank(),
+  legend.title = element_text(size = 12),
+  legend.text = element_text(color = "grey9"),
+  plot.title = element_text(size = 18, face = "bold"),
+  plot.subtitle = element_text(size = 12, color = "grey9"),
+  plot.caption = element_text(size = 9, margin = margin(t = 15))
+)
+
+# Data importing
+coal_data <- read_xlsx("Indian Coal Mines Data.xlsx") |> 
+  clean_names()
+
+# Importing shp file
+
+shp1 <- read_sf("india_shp_files/IND_adm1.shp")
+
+shp1 <- shp1 |> 
+  mutate(NAME_1 = if_else(NAME_1 == 'Uttaranchal',
+                          'Uttarakhand',
+                          NAME_1))
+
+# Aggregate coal production data by state
+coal_data_agg <- coal_data %>%
+  group_by(state_ut_name) %>%
+  summarize(coal_production_total = sum(coal_lignite_production_mt_2019_2020, 
+                                        na.rm = TRUE))
+
+# Merge the Indian map data with the aggregated coal production data based on state names
+merged_data <- shp1 %>%
+  left_join(coal_data_agg, by = c("NAME_1" = "state_ut_name"))
+
+
+merged_data |> 
+  ggplot() +
+  geom_sf(aes(fill = coal_production_total)) +
+  scale_fill_gradient(low = "white", high = "black",
+                      na.value = NA,
+                      name = "Coal Produced") +
+  labs(title = "Coal and Lignite Production (2019-2020)") + 
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    legend.position = "bottom",
+    legend.text.align = 0.5,
+    legend.key.height = unit(0.2, "in"),
+    legend.key.width = unit(0.3, "in"),
+    legend.title = element_text(vjust = 1, face = "bold")
+  )
+
+
+
+# Top 10 companies which produced coal
+
+top_ten_companies <- coal_data |>
+  group_by(coal_mine_owner_full_name) |>
+  summarize(total_mine = round(sum(coal_lignite_production_mt_2019_2020,
+                                   na.rm = TRUE), 1)) |>
+  top_n(10) |>
+  mutate(coal_mine_owner_full_name = ifelse(is.na(coal_mine_owner_full_name), 'Others', coal_mine_owner_full_name))
+
+ggplot(top_ten_companies, 
+       aes(x = reorder(coal_mine_owner_full_name, -total_mine), y = total_mine)) +
+  geom_bar(stat = "identity", fill = "black") +
+  geom_text(aes(label = total_mine), hjust = -0.1) +
+  labs(title = "Top Ten Companies by Total Production",
+       x = "Coal Mine Owner",
+       y = "Total Production (MT)") +
+  coord_flip() +
+  theme_minimal()
+
+
+# Top ten mines
+top_ten_mines <- coal_data |>
+  group_by(mine_name) |>
+  summarize(total_mine = round(sum(coal_lignite_production_mt_2019_2020,
+                                   na.rm = TRUE), 1)) |>
+  top_n(10)
+
+
+ggplot(top_ten_mines, 
+       aes(x = reorder(mine_name, -total_mine), y = total_mine)) +
+  geom_bar(stat = "identity", fill = "black") +
+  geom_text(aes(label = total_mine), hjust = -0.1) +
+  labs(title = "Top Ten Mines by Total Production",
+       x = "Coal Mine Owner",
+       y = "Total Production (MT)") +
+  coord_flip() +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
