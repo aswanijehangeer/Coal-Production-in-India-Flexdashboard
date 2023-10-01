@@ -119,6 +119,7 @@ renderPlot({
 
 ```{r}
 
+# Top ten mines
 top_ten_mines <- coal_data |>
   group_by(mine_name) |>
   summarize(total_mine = round(sum(coal_lignite_production_mt_2019_2020,
